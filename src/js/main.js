@@ -1758,7 +1758,6 @@ function setupQuickActions() {
             if (result.isConfirmed) {
               const customFood = result.value;
 
-              // إنشاء كائن الوجبة المخصصة
               const customMeal = {
                 type: 'custom',
                 name: customFood.name,
@@ -1775,7 +1774,6 @@ function setupQuickActions() {
                 loggedAt: new Date().toISOString(),
               };
 
-              // جلب البيانات الحالية
               let foodLog = JSON.parse(localStorage.getItem('foodLog')) || {
                 totalCalories: 0,
                 totalProtein: 0,
@@ -1784,19 +1782,15 @@ function setupQuickActions() {
                 meals: [],
               };
 
-              // تحديث الإجماليات
               foodLog.totalCalories += customMeal.nutrition.calories;
               foodLog.totalProtein += customMeal.nutrition.protein;
               foodLog.totalCarbs += customMeal.nutrition.carbs;
               foodLog.totalFat += customMeal.nutrition.fat;
 
-              // إضافة الوجبة
               foodLog.meals.push(customMeal);
 
-              // حفظ في localStorage
               localStorage.setItem('foodLog', JSON.stringify(foodLog));
 
-              // إعادة عرض البيانات
               displayFoodLog();
 
               Swal.fire({
@@ -1830,6 +1824,19 @@ barcodeInput.addEventListener('keypress', e => {
 });
 
 async function barcodeSearch(barcodeNumber) {
+  if (!barcodeNumber || barcodeNumber.trim() === '') {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Warning',
+      text: 'Please enter a barcode number first',
+      confirmButtonText: 'OK',
+      customClass: {
+        confirmButton: 'bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-xl',
+      },
+    });
+    return;
+  }
+
   try {
     const barcode = new Barcode(barcodeNumber);
     const data = await barcode.searchProductsByBarcode();
@@ -1842,13 +1849,45 @@ async function barcodeSearch(barcodeNumber) {
         ? [data]
         : [];
 
+    if (finalData.length === 0) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Product Not Found',
+        html: `
+          <p class="text-gray-600 mb-2">Barcode: <strong>${barcodeNumber}</strong></p>
+          <p class="text-sm text-gray-500">We couldn't find a product with this barcode</p>
+          <p class="text-sm text-gray-500 mt-2">Please check:</p>
+          <ul class="text-sm text-gray-500 list-disc list-inside mt-1">
+            <li>The barcode number is correct</li>
+            <li>The product exists in our database</li>
+          </ul>
+        `,
+        confirmButtonText: 'OK',
+        customClass: {
+          confirmButton: 'bg-red-600 hover:bg-red-700 px-6 py-3 rounded-xl',
+        },
+      });
+      productsGrid.innerHTML = `
+        <div class="flex flex-col items-center justify-center h-[calc(100vh-20rem)] w-full text-center col-span-2">
+          <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <i class="fa-solid fa-barcode text-red-500 text-3xl"></i>
+          </div>
+          <p class="text-gray-700 text-xl font-semibold mb-2">Product Not Found</p>
+          <p class="text-gray-500 mb-1">Barcode: ${barcodeNumber}</p>
+          <p class="text-gray-400 text-sm">Try another barcode or search by name</p>
+        </div>
+      `;
+      productsCount.textContent = 'No products found';
+      return;
+    }
+
     renderProducts(finalData);
   } catch (err) {
     console.error('Barcode search failed:', err);
     Swal.fire({
       icon: 'error',
-      title: 'Error',
-      text: 'Failed to fetch product. Please try again.',
+      title: 'Search Error',
+      text: 'An error occurred while searching for the product. Please try again.',
       confirmButtonText: 'OK',
       customClass: {
         confirmButton: 'bg-red-600 hover:bg-red-700 px-6 py-3 rounded-xl',
@@ -2356,7 +2395,6 @@ function showProductDetails(product) {
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 
-  // Event listeners
   modal.querySelectorAll('.close-product-modal').forEach(btn => {
     btn.addEventListener('click', () => {
       modal.classList.add('hidden');
