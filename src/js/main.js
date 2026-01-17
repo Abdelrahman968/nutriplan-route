@@ -137,6 +137,14 @@ sidebarOverlay.addEventListener('click', () => {
   document.body.style.overflow = 'auto';
 });
 
+allButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    sidebarOverlay.classList.remove('active');
+    document.body.style.overflow = 'auto';
+  });
+});
+
 function renderMeals(meals, layout = currentLayout) {
   currentLayout = layout;
 
