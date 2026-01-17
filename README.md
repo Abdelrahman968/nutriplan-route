@@ -1,12 +1,12 @@
 # NutriPlan - Food, Nutrition & Fitness Planner 🍽️
 
-![NutriPlan Banner](src/images/favicon.png)
+<img src="src/images/favicon.png" alt="NutriPlan Banner" width="100" height="100">
 
 **NutriPlan** is a modern, responsive web application that helps users discover meals & recipes, scan product barcodes for nutritional information, analyze food nutrition, and track daily food intake with a clean food log system.
 
 Built with vanilla JavaScript (ES6 modules), Tailwind CSS, and powered by a custom API ([nutriplan-api](https://nutriplan-api.vercel.app)), this project focuses on providing a fast, offline-capable, halal-friendly nutrition planning experience.
 
-**Live Demo:** https://nutriplan-route.vercel.app
+**Live Demo:** https://abdelrahman968.github.io/nutriplan-route/
 
 **GitHub Repo:** https://github.com/Abdelrahman968/nutriplan-route
 
