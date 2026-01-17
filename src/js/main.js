@@ -1105,7 +1105,6 @@ async function filterMealsByCategory(category) {
   updateRecipesCount(filteredMeals.length, category);
 }
 
-// Button Events
 mealsRecipesBtn.addEventListener('click', e => {
   e.preventDefault();
   activateButton(
@@ -1694,14 +1693,12 @@ function setupQuickActions() {
             },
             width: '600px',
             didOpen: () => {
-              // Handle image upload preview
               const imageInput = document.getElementById('custom-food-image');
               const imagePreview = document.getElementById('image-preview');
 
               imageInput.addEventListener('change', e => {
                 const file = e.target.files[0];
                 if (file) {
-                  // Check file size (2MB max)
                   if (file.size > 2 * 1024 * 1024) {
                     Swal.showValidationMessage(
                       'Image size must be less than 2MB'
@@ -2059,145 +2056,153 @@ async function productSearch(val) {
 
 function renderProducts(products) {
   try {
-    productsCount.textContent = `found ${products.length} products ${
-      productSearchInput.value ? `for : "${productSearchInput.value}"` : ''
-    }`;
+    productsGrid.innerHTML = `
+      <div class="flex items-center justify-center h-[calc(100vh-20rem)] w-full">
+        <div class="loader"></div>
+      </div>
+    `;
 
-    if (products.length === 0) {
-      productsCount.textContent = `No products found ${
+    setTimeout(() => {
+      productsCount.textContent = `found ${products.length} products ${
         productSearchInput.value ? `for : "${productSearchInput.value}"` : ''
       }`;
-      productsGrid.classList.remove('grid', 'grid-cols-2', 'gap-4');
-      productsGrid.innerHTML = `
-    <div class="flex flex-col items-center justify-center h-[calc(100vh-20rem)] w-full text-center">
-        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <i class="fa-solid fa-box-open text-gray-400 text-2xl"></i>
-        </div>
-        <p class="text-gray-500 text-lg">No products found</p>
-        <p class="text-gray-400 text-sm mt-2">Try searching for something else</p>
-    </div>
-    `;
-      return;
-    } else {
-      productsGrid.classList.add('grid', 'grid-cols-2', 'gap-4');
-    }
 
-    const html = products
-      .slice(0, 12)
-      .map(
-        product => `
-     <div
-        class="product-card bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer group"
-        data-barcode="${product.barcode || 'N/A'}"
-      >
-        <div
-          class="relative h-40 bg-gray-100 flex items-center justify-center overflow-hidden"
-        >
-          <img
-            class="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
-            src="${product.image || './src/images/placeholder.png'}"
-            alt="${product.name || 'Product Image'}"
-            loading="lazy"
-          />
-
-          <!-- Nutri-Score Badge -->
-          <div
-            class="absolute top-2 left-2 text-white text-xs font-bold px-2 py-1 rounded uppercase ${
-              product.nutritionGrade === 'a'
-                ? 'bg-green-500'
-                : product.nutritionGrade === 'b'
-                ? 'bg-yellow-500'
-                : product.nutritionGrade === 'c'
-                ? 'bg-orange-500'
-                : 'bg-red-500'
-            }"
-          >
-            Nutri-Score ${product.nutritionGrade || 'N/A'}
+      if (products.length === 0) {
+        productsCount.textContent = `No products found ${
+          productSearchInput.value ? `for : "${productSearchInput.value}"` : ''
+        }`;
+        productsGrid.classList.remove('grid', 'grid-cols-2', 'gap-4');
+        productsGrid.innerHTML = `
+      <div class="flex flex-col items-center justify-center h-[calc(100vh-20rem)] w-full text-center">
+          <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <i class="fa-solid fa-box-open text-gray-400 text-2xl"></i>
           </div>
-
-          <!-- NOVA Badge -->
-          <div
-            class="absolute top-2 right-2 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${
-              product.novaGroup === '1'
-                ? 'bg-green-500'
-                : product.novaGroup === '2'
-                ? 'bg-yellow-500'
-                : product.novaGroup === '3'
-                ? 'bg-orange-500'
-                : 'bg-red-500'
-            }"
-            title="NOVA ${product.novaGroup || 'N/A'}"
-          >
-            ${product.novaGroup || 'N/A'}
-          </div>
-        </div>
-
-        <div class="p-4">
-          <p
-            class="text-xs text-emerald-600 font-semibold mb-1 truncate"
-          >
-            ${product.brand || 'N/A'}
-          </p>
-          <h3
-            class="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-emerald-600 transition-colors"
-          >
-            ${product.name || 'Product Name'}
-          </h3>
-
-          <div
-            class="flex items-center gap-3 text-xs text-gray-500 mb-3"
-          >
-            <span
-              ><i class="fa-solid fa-weight-scale mr-1"></i>${
-                product.servingSize || 'N/A'
-              }</span
-            >
-            <span
-              ><i class="fa-solid fa-fire mr-1"></i>${
-                product.nutrients.calories || 'N/A'
-              } kcal/100g</span
-            >
-          </div>
-
-          <!-- Mini Nutrition -->
-          <div class="grid grid-cols-4 gap-1 text-center">
-            <div class="bg-emerald-50 rounded p-1.5">
-              <p class="text-xs font-bold text-emerald-700">${
-                product.nutrients.protein || 'N/A'
-              }g</p>
-              <p class="text-[10px] text-gray-500">Protein</p>
-            </div>
-            <div class="bg-blue-50 rounded p-1.5">
-              <p class="text-xs font-bold text-blue-700">${
-                product.nutrients.carbs || 'N/A'
-              }g</p>
-              <p class="text-[10px] text-gray-500">Carbs</p>
-            </div>
-            <div class="bg-purple-50 rounded p-1.5">
-              <p class="text-xs font-bold text-purple-700">${
-                product.nutrients.fat || 'N/A'
-              }g</p>
-              <p class="text-[10px] text-gray-500">Fat</p>
-            </div>
-            <div class="bg-orange-50 rounded p-1.5">
-              <p class="text-xs font-bold text-orange-700">${
-                product.nutrients.sugar || 'N/A'
-              }g</p>
-              <p class="text-[10px] text-gray-500">Sugar</p>
-            </div>
-          </div>
-        </div>
+          <p class="text-gray-500 text-lg">No products found</p>
+          <p class="text-gray-400 text-sm mt-2">Try searching for something else</p>
       </div>
-  `
-      )
-      .join('');
-    productsGrid.innerHTML = html;
+      `;
+        return;
+      } else {
+        productsGrid.classList.add('grid', 'grid-cols-2', 'gap-4');
+      }
 
-    document.querySelectorAll('.product-card').forEach((card, index) => {
-      card.addEventListener('click', () => {
-        showProductDetails(products[index]);
+      const html = products
+        .slice(0, 12)
+        .map(
+          product => `
+       <div
+          class="product-card bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer group"
+          data-barcode="${product.barcode || 'N/A'}"
+        >
+          <div
+            class="relative h-40 bg-gray-100 flex items-center justify-center overflow-hidden"
+          >
+            <img
+              class="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
+              src="${product.image || './src/images/placeholder.png'}"
+              alt="${product.name || 'Product Image'}"
+              loading="lazy"
+            />
+
+            <!-- Nutri-Score Badge -->
+            <div
+              class="absolute top-2 left-2 text-white text-xs font-bold px-2 py-1 rounded uppercase ${
+                product.nutritionGrade === 'a'
+                  ? 'bg-green-500'
+                  : product.nutritionGrade === 'b'
+                  ? 'bg-yellow-500'
+                  : product.nutritionGrade === 'c'
+                  ? 'bg-orange-500'
+                  : 'bg-red-500'
+              }"
+            >
+              Nutri-Score ${product.nutritionGrade || 'N/A'}
+            </div>
+
+            <!-- NOVA Badge -->
+            <div
+              class="absolute top-2 right-2 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${
+                product.novaGroup === '1'
+                  ? 'bg-green-500'
+                  : product.novaGroup === '2'
+                  ? 'bg-yellow-500'
+                  : product.novaGroup === '3'
+                  ? 'bg-orange-500'
+                  : 'bg-red-500'
+              }"
+              title="NOVA ${product.novaGroup || 'N/A'}"
+            >
+              ${product.novaGroup || 'N/A'}
+            </div>
+          </div>
+
+          <div class="p-4">
+            <p
+              class="text-xs text-emerald-600 font-semibold mb-1 truncate"
+            >
+              ${product.brand || 'N/A'}
+            </p>
+            <h3
+              class="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-emerald-600 transition-colors"
+            >
+              ${product.name || 'Product Name'}
+            </h3>
+
+            <div
+              class="flex items-center gap-3 text-xs text-gray-500 mb-3"
+            >
+              <span
+                ><i class="fa-solid fa-weight-scale mr-1"></i>${
+                  product.servingSize || 'N/A'
+                }</span
+              >
+              <span
+                ><i class="fa-solid fa-fire mr-1"></i>${
+                  product.nutrients.calories || 'N/A'
+                } kcal/100g</span
+              >
+            </div>
+
+            <!-- Mini Nutrition -->
+            <div class="grid grid-cols-4 gap-1 text-center">
+              <div class="bg-emerald-50 rounded p-1.5">
+                <p class="text-xs font-bold text-emerald-700">${
+                  product.nutrients.protein || 'N/A'
+                }g</p>
+                <p class="text-[10px] text-gray-500">Protein</p>
+              </div>
+              <div class="bg-blue-50 rounded p-1.5">
+                <p class="text-xs font-bold text-blue-700">${
+                  product.nutrients.carbs || 'N/A'
+                }g</p>
+                <p class="text-[10px] text-gray-500">Carbs</p>
+              </div>
+              <div class="bg-purple-50 rounded p-1.5">
+                <p class="text-xs font-bold text-purple-700">${
+                  product.nutrients.fat || 'N/A'
+                }g</p>
+                <p class="text-[10px] text-gray-500">Fat</p>
+              </div>
+              <div class="bg-orange-50 rounded p-1.5">
+                <p class="text-xs font-bold text-orange-700">${
+                  product.nutrients.sugar || 'N/A'
+                }g</p>
+                <p class="text-[10px] text-gray-500">Sugar</p>
+              </div>
+            </div>
+          </div>
+        </div>
+    `
+        )
+        .join('');
+      productsGrid.innerHTML = html;
+
+      document.querySelectorAll('.product-card').forEach((card, index) => {
+        card.addEventListener('click', () => {
+          showProductDetails(products[index]);
+        });
       });
-    });
+    }, 500);
   } catch (error) {
     console.error(error);
     Swal.fire({
