@@ -326,45 +326,69 @@ async function getMealDetails(mealId) {
     const meal = await getById.getMealById();
     const selectedMeal = Array.isArray(meal) ? meal[0] : meal;
 
-    // Include both measure and ingredient name for API
     const ingredientsItems = selectedMeal.ingredients
-      .map(ingredient => {
-        const measure = ingredient.measure || '';
-        const name = ingredient.ingredient || '';
-        // Combine measure and ingredient name (e.g., "2 tbsp Soy Sauce")
-        return measure && name ? `${measure} ${name}` : name;
-      })
-      .filter(item => item.trim() !== ''); // Remove empty items
+      .map(ingredient => ingredient.ingredient || '')
+      .filter(item => item.trim() !== '');
 
     console.log(ingredientsItems);
 
     const analyze = new Analyze(selectedMeal.name, ingredientsItems);
-    const apiResponse = await analyze.fetchCaloriesData();
 
-    // Extract nutrition data from the new API response structure
-    const caloriesData = apiResponse.success ? apiResponse.data.totals : null;
-    const perServing = apiResponse.success ? apiResponse.data.perServing : null;
-    const servings = apiResponse.success ? apiResponse.data.servings : 4;
+    let apiResponse, caloriesData, perServing, servings;
+    try {
+      apiResponse = await analyze.fetchCaloriesData();
+      caloriesData = apiResponse.success ? apiResponse.data.totals : null;
+      perServing = apiResponse.success ? apiResponse.data.perServing : null;
+      servings = apiResponse.success ? apiResponse.data.servings : 4;
+    } catch (error) {
+      console.warn('Nutrition API failed, using default values:', error);
+      caloriesData = {
+        calories: 0,
+        protein: 0,
+        fat: 0,
+        carbs: 0,
+        fiber: 0,
+        sugar: 0,
+      };
+      perServing = {
+        calories: 0,
+        protein: 0,
+        fat: 0,
+        carbs: 0,
+        fiber: 0,
+        sugar: 0,
+        saturatedFat: 0,
+        cholesterol: 0,
+        sodium: 0,
+      };
+      servings = 4;
+    }
 
     console.log(selectedMeal.name);
     console.log(`apiResponse`, apiResponse);
     console.log(`caloriesData`, caloriesData);
     console.log(`perServing`, perServing);
 
-    // Use perServing data for display
-    const caloriesPerServing = perServing ? perServing.calories : 'N/A';
-    const proteinPerServing = perServing ? perServing.protein : 0;
-    const carbsPerServing = perServing ? perServing.carbs : 0;
-    const fatPerServing = perServing ? perServing.fat : 0;
-    const fiberPerServing = perServing ? perServing.fiber : 0;
-    const sugarPerServing = perServing ? perServing.sugar : 0;
+    const caloriesPerServing =
+      perServing && perServing.calories ? perServing.calories : 'N/A';
+    const proteinPerServing =
+      perServing && perServing.protein ? perServing.protein : 0;
+    const carbsPerServing =
+      perServing && perServing.carbs ? perServing.carbs : 0;
+    const fatPerServing = perServing && perServing.fat ? perServing.fat : 0;
+    const fiberPerServing =
+      perServing && perServing.fiber ? perServing.fiber : 0;
+    const sugarPerServing =
+      perServing && perServing.sugar ? perServing.sugar : 0;
 
-    // Calculate percentages for progress bars (based on a 2000 calorie diet recommendation)
-    const proteinPercent = Math.min((proteinPerServing / 50) * 100, 100); // 50g recommended
-    const carbsPercent = Math.min((carbsPerServing / 275) * 100, 100); // 275g recommended
-    const fatPercent = Math.min((fatPerServing / 78) * 100, 100); // 78g recommended
-    const fiberPercent = Math.min((fiberPerServing / 28) * 100, 100); // 28g recommended
-    const sugarPercent = Math.min((sugarPerServing / 50) * 100, 100); // 50g recommended
+    const nutritionAvailable =
+      caloriesPerServing !== 'N/A' && caloriesPerServing !== 0;
+
+    const proteinPercent = Math.min((proteinPerServing / 50) * 100, 100);
+    const carbsPercent = Math.min((carbsPerServing / 275) * 100, 100);
+    const fatPercent = Math.min((fatPerServing / 78) * 100, 100);
+    const fiberPercent = Math.min((fiberPerServing / 28) * 100, 100);
+    const sugarPercent = Math.min((sugarPerServing / 50) * 100, 100);
 
     mealDetailsSection.innerHTML = `
      <div class="max-w-7xl mx-auto">
@@ -421,7 +445,7 @@ async function getMealDetails(mealId) {
                   </span>
                   <span class="flex items-center gap-2">
                     <i class="fa-solid fa-fire"></i>
-                    <span id="hero-calories">${caloriesPerServing} cal/serving</span>
+                    <span id="hero-calories">${nutritionAvailable ? caloriesPerServing + ' cal/serving' : 'Nutrition data unavailable'}</span>
                   </span>
                 </div>
               </div>
@@ -565,6 +589,9 @@ async function getMealDetails(mealId) {
                   Nutrition Facts
                 </h2>
                 <div id="nutrition-facts-container">
+                  ${
+                    nutritionAvailable
+                      ? `
                   <p class="text-sm text-gray-500 mb-4">Per serving</p>
 
                   <div
@@ -666,6 +693,17 @@ async function getMealDetails(mealId) {
                       </div>
                     </div>
                   </div>
+                  `
+                      : `
+                  <div class="text-center py-8">
+                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <i class="fa-solid fa-triangle-exclamation text-gray-400 text-2xl"></i>
+                    </div>
+                    <p class="text-gray-600 font-semibold mb-2">Nutrition Data Unavailable</p>
+                    <p class="text-sm text-gray-500">Some ingredients couldn't be analyzed</p>
+                  </div>
+                  `
+                  }
                 </div>
               </div>
             </div>
@@ -950,7 +988,7 @@ function setupAreaButtons() {
       btn.className = activeAreaClass;
 
       const selectedArea = btn.dataset.area;
-      console.log('Selected area:', selectedArea);
+      // console.log('Selected area:', selectedArea);
 
       filterMealsByArea(selectedArea);
     });
@@ -1101,7 +1139,7 @@ function setupCategoryButtons() {
   categoryButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const selectedCategory = btn.dataset.category;
-      console.log('Selected category:', selectedCategory);
+      // console.log('Selected category:', selectedCategory);
 
       filterMealsByCategory(selectedCategory);
     });
@@ -2050,7 +2088,7 @@ async function productCategoriesBtn() {
   const data = await categories.getProductCategories();
 
   const slicedData = data.slice(0, 8);
-  console.log(slicedData);
+  // console.log(slicedData);
 
   productCategories.innerHTML = slicedData
     .map((c, index) => {
