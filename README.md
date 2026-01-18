@@ -15,6 +15,7 @@ Built with vanilla JavaScript (ES6 modules), Tailwind CSS, and powered by a cust
 ## ✨ Features
 
 ### Meals & Recipes Discovery
+
 - Search meals by name
 - Filter by category, cuisine (area), and main ingredient
 - Browse halal-friendly categories (Pork category automatically excluded)
@@ -22,16 +23,19 @@ Built with vanilla JavaScript (ES6 modules), Tailwind CSS, and powered by a cust
 - Detailed meal view with ingredients, instructions, and nutrition analysis
 
 ### Product Scanner
+
 - Search grocery products by name
 - Barcode lookup for instant product details
 - Nutri-Score & Nova Group visualization
 - Filter by Nutri-Score grade
 
 ### Nutrition Analysis
+
 - Analyze custom recipes by title + ingredient list
 - Accurate calorie & macronutrient breakdown using API-powered parsing
 
 ### Food Log System
+
 - Log meals or scanned products with custom serving sizes
 - Daily totals: Calories, Protein, Carbs, Fat
 - Progress bars toward common goals
@@ -39,10 +43,12 @@ Built with vanilla JavaScript (ES6 modules), Tailwind CSS, and powered by a cust
 - Weekly overview chart (Plotly.js)
 
 ### Fully Responsive Design
+
 - Mobile-first with sidebar navigation
 - Smooth loading states and modals (SweetAlert2)
 
 ### Offline-First Ready
+
 - No build tools required — pure HTML/CSS/JS
 - Fast loading with CDN assets
 
@@ -129,6 +135,7 @@ This frontend consumes the following API endpoints:
 **Base URL:** `https://nutriplan-api.vercel.app/api`
 
 ### Key Endpoints Used:
+
 - `/meals/search` – Search meals
 - `/meals/filter` – Filter by category/area/ingredient
 - `/meals/categories`, `/meals/areas` – Get available filters
@@ -154,7 +161,7 @@ This frontend consumes the following API endpoints:
 
 ## 📱 Screenshots
 
-*(Add screenshots later by placing them in `/src/images/screenshots/` and linking here)*
+- open the live demo link to see the screenshots :)
 
 ---
 
