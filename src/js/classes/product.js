@@ -25,8 +25,6 @@ class Product {
       console.error('Product search failed:', error);
       throw error;
     }
-
-    return data;
   }
 }
 

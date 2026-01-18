@@ -21,6 +21,8 @@ class Categories {
       throw error;
     }
   }
+
+
 }
 
 export default Categories;

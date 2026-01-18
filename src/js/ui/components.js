@@ -15,3 +15,24 @@
     <p class="text-gray-400 text-sm mt-2">Try searching for something else</p>
 </div>
 */
+
+
+
+//   <div class="grid grid-cols-2 gap-3 text-sm">
+//     <div class="flex justify-between">
+//       <span class="text-gray-600">Vitamin A</span>
+//       <span class="font-medium">15%</span>
+//     </div>
+//     <div class="flex justify-between">
+//       <span class="text-gray-600">Vitamin C</span>
+//       <span class="font-medium">25%</span>
+//     </div>
+//     <div class="flex justify-between">
+//       <span class="text-gray-600">Calcium</span>
+//       <span class="font-medium">4%</span>
+//     </div>
+//     <div class="flex justify-between">
+//       <span class="text-gray-600">Iron</span>
+//       <span class="font-medium">12%</span>
+//     </div>
+//   </div>;

@@ -6,6 +6,7 @@ import GetById from './classes/getById.js';
 import Analyze from './classes/analyze.js';
 import Product from './classes/product.js';
 import Barcode from './classes/barcode.js';
+import ProductCategories from './classes/productCategories.js';
 
 if (!document.querySelector('link[href*="sweetalert2"]')) {
   const link = document.createElement('link');
@@ -297,9 +298,6 @@ async function getMealDetails(mealId) {
       const params = new URLSearchParams(queryString);
 
       mealId = params.get('id');
-      // const mealName = params.get('name');
-
-      // console.log('From URL hash ', { mealId, mealName });
     } else {
       console.error('No mealId provided and URL hash not found.');
       return;
@@ -309,9 +307,17 @@ async function getMealDetails(mealId) {
   const getById = new GetById(mealId);
 
   function getYoutubeEmbedUrl(url) {
-    const regExp = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^\s&]+)/;
+    if (!url || url.trim() === '') return null;
+
+    const regExp =
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
     const match = url.match(regExp);
-    return match ? `https://www.youtube.com/embed/${match[1]}` : null;
+
+    if (match && match[1]) {
+      return `https://www.youtube.com/embed/${match[1]}`;
+    }
+
+    return null;
   }
 
   try {
@@ -320,13 +326,45 @@ async function getMealDetails(mealId) {
     const meal = await getById.getMealById();
     const selectedMeal = Array.isArray(meal) ? meal[0] : meal;
 
-    const ingredientsItems = selectedMeal.ingredients.map(ingredient => {
-      return ingredient.ingredient;
-    });
-    const analyze = new Analyze(selectedMeal.name, ingredientsItems);
-    const caloriesData = await analyze.fetchCaloriesData();
+    // Include both measure and ingredient name for API
+    const ingredientsItems = selectedMeal.ingredients
+      .map(ingredient => {
+        const measure = ingredient.measure || '';
+        const name = ingredient.ingredient || '';
+        // Combine measure and ingredient name (e.g., "2 tbsp Soy Sauce")
+        return measure && name ? `${measure} ${name}` : name;
+      })
+      .filter(item => item.trim() !== ''); // Remove empty items
 
-    const nutrientsData = await analyze.fetchNutrientsData(ingredientsItems);
+    console.log(ingredientsItems);
+
+    const analyze = new Analyze(selectedMeal.name, ingredientsItems);
+    const apiResponse = await analyze.fetchCaloriesData();
+
+    // Extract nutrition data from the new API response structure
+    const caloriesData = apiResponse.success ? apiResponse.data.totals : null;
+    const perServing = apiResponse.success ? apiResponse.data.perServing : null;
+    const servings = apiResponse.success ? apiResponse.data.servings : 4;
+
+    console.log(selectedMeal.name);
+    console.log(`apiResponse`, apiResponse);
+    console.log(`caloriesData`, caloriesData);
+    console.log(`perServing`, perServing);
+
+    // Use perServing data for display
+    const caloriesPerServing = perServing ? perServing.calories : 'N/A';
+    const proteinPerServing = perServing ? perServing.protein : 0;
+    const carbsPerServing = perServing ? perServing.carbs : 0;
+    const fatPerServing = perServing ? perServing.fat : 0;
+    const fiberPerServing = perServing ? perServing.fiber : 0;
+    const sugarPerServing = perServing ? perServing.sugar : 0;
+
+    // Calculate percentages for progress bars (based on a 2000 calorie diet recommendation)
+    const proteinPercent = Math.min((proteinPerServing / 50) * 100, 100); // 50g recommended
+    const carbsPercent = Math.min((carbsPerServing / 275) * 100, 100); // 275g recommended
+    const fatPercent = Math.min((fatPerServing / 78) * 100, 100); // 78g recommended
+    const fiberPercent = Math.min((fiberPerServing / 28) * 100, 100); // 28g recommended
+    const sugarPercent = Math.min((sugarPerServing / 50) * 100, 100); // 50g recommended
 
     mealDetailsSection.innerHTML = `
      <div class="max-w-7xl mx-auto">
@@ -379,15 +417,11 @@ async function getMealDetails(mealId) {
                   </span>
                   <span class="flex items-center gap-2">
                     <i class="fa-solid fa-utensils"></i>
-                    <span id="hero-servings">${
-                      selectedMeal.servings || 4
-                    } servings</span>
+                    <span id="hero-servings">${servings} servings</span>
                   </span>
                   <span class="flex items-center gap-2">
                     <i class="fa-solid fa-fire"></i>
-                    <span id="hero-calories">${
-                      caloriesData.totalCalories / 4 || 'N/A'
-                    } cal/serving</span>
+                    <span id="hero-calories">${caloriesPerServing} cal/serving</span>
                   </span>
                 </div>
               </div>
@@ -425,9 +459,6 @@ async function getMealDetails(mealId) {
                   >
                 </h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  
-
-
                   ${selectedMeal.ingredients
                     .map(ingredient => {
                       return `
@@ -480,6 +511,9 @@ async function getMealDetails(mealId) {
               </div>
 
               <!-- Video Section -->
+              ${
+                selectedMeal.youtube && getYoutubeEmbedUrl(selectedMeal.youtube)
+                  ? `
               <div class="bg-white rounded-2xl shadow-lg p-6">
                 <h2
                   class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"
@@ -500,6 +534,24 @@ async function getMealDetails(mealId) {
                   </iframe>
                 </div>
               </div>
+              `
+                  : `
+              <div class="bg-white rounded-2xl shadow-lg p-6">
+                <h2
+                  class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"
+                >
+                  <i class="fa-solid fa-video text-red-500"></i>
+                  Video Tutorial
+                </h2>
+                <div class="relative aspect-video rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
+                  <div class="text-center p-8">
+                    <i class="fa-solid fa-video-slash text-gray-400 text-4xl mb-4"></i>
+                    <p class="text-gray-500">No video tutorial available for this recipe</p>
+                  </div>
+                </div>
+              </div>
+              `
+              }
             </div>
 
             <!-- Right Column - Nutrition -->
@@ -516,15 +568,11 @@ async function getMealDetails(mealId) {
                   <p class="text-sm text-gray-500 mb-4">Per serving</p>
 
                   <div
-                    class="text-center py-4 mb-4 bg-linear-to-br from-emerald-50 to-teal-50 rounded-xl"
+                    class="text-center py-4 mb-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl"
                   >
                     <p class="text-sm text-gray-600">Calories per serving</p>
-                    <p class="text-4xl font-bold text-emerald-600">${
-                      caloriesData.totalCalories / 4
-                    }</p>
-                    <p class="text-xs text-gray-500 mt-1">Total: ${
-                      caloriesData.totalCalories
-                    } cal</p>
+                    <p class="text-4xl font-bold text-emerald-600">${caloriesPerServing}</p>
+                    <p class="text-xs text-gray-500 mt-1">Total: ${caloriesData ? caloriesData.calories : 'N/A'} cal</p>
                   </div>
 
                   <div class="space-y-4">
@@ -533,18 +581,12 @@ async function getMealDetails(mealId) {
                         <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
                         <span class="text-gray-700">Protein</span>
                       </div>
-                      <span class="font-bold text-gray-900">${
-                        nutrientsData.protein
-                      }g</span>
+                      <span class="font-bold text-gray-900">${proteinPerServing}g</span>
                     </div>
                     <div class="w-full bg-gray-100 rounded-full h-2">
                       <div
                         class="bg-emerald-500 h-2 rounded-full"
-                        style="width: ${
-                          ((nutrientsData.protein * 4) /
-                            caloriesData.totalCalories) *
-                          100
-                        }%"
+                        style="width: ${proteinPercent}%"
                       ></div>
                     </div>
 
@@ -553,18 +595,12 @@ async function getMealDetails(mealId) {
                         <div class="w-3 h-3 rounded-full bg-blue-500"></div>
                         <span class="text-gray-700">Carbs</span>
                       </div>
-                      <span class="font-bold text-gray-900">${
-                        nutrientsData.carbs
-                      }g</span>
+                      <span class="font-bold text-gray-900">${carbsPerServing}g</span>
                     </div>
                     <div class="w-full bg-gray-100 rounded-full h-2">
                       <div
                         class="bg-blue-500 h-2 rounded-full"
-                        style="width: ${
-                          ((nutrientsData.carbs * 4) /
-                            caloriesData.totalCalories) *
-                          100
-                        }%"
+                        style="width: ${carbsPercent}%"
                       ></div>
                     </div>
 
@@ -573,18 +609,12 @@ async function getMealDetails(mealId) {
                         <div class="w-3 h-3 rounded-full bg-purple-500"></div>
                         <span class="text-gray-700">Fat</span>
                       </div>
-                      <span class="font-bold text-gray-900">${
-                        nutrientsData.fat
-                      }g</span>
+                      <span class="font-bold text-gray-900">${fatPerServing}g</span>
                     </div>
                     <div class="w-full bg-gray-100 rounded-full h-2">
                       <div
                         class="bg-purple-500 h-2 rounded-full"
-                        style="width: ${
-                          ((nutrientsData.fat * 4) /
-                            caloriesData.totalCalories) *
-                          100
-                        }%"
+                        style="width: ${fatPercent}%"
                       ></div>
                     </div>
 
@@ -593,18 +623,12 @@ async function getMealDetails(mealId) {
                         <div class="w-3 h-3 rounded-full bg-orange-500"></div>
                         <span class="text-gray-700">Fiber</span>
                       </div>
-                      <span class="font-bold text-gray-900">${
-                        nutrientsData.fiber
-                      }g</span>
+                      <span class="font-bold text-gray-900">${fiberPerServing}g</span>
                     </div>
                     <div class="w-full bg-gray-100 rounded-full h-2">
                       <div
                         class="bg-orange-500 h-2 rounded-full"
-                        style="width: ${
-                          ((nutrientsData.fiber * 4) /
-                            caloriesData.totalCalories) *
-                          100
-                        }%"
+                        style="width: ${fiberPercent}%"
                       ></div>
                     </div>
 
@@ -613,42 +637,32 @@ async function getMealDetails(mealId) {
                         <div class="w-3 h-3 rounded-full bg-pink-500"></div>
                         <span class="text-gray-700">Sugar</span>
                       </div>
-                      <span class="font-bold text-gray-900">${
-                        nutrientsData.sugar
-                      }g</span>
+                      <span class="font-bold text-gray-900">${sugarPerServing}g</span>
                     </div>
                     <div class="w-full bg-gray-100 rounded-full h-2">
                       <div
                         class="bg-pink-500 h-2 rounded-full"
-                        style="width: ${
-                          ((nutrientsData.sugar * 4) /
-                            caloriesData.totalCalories) *
-                          100
-                        }%"
+                        style="width: ${sugarPercent}%"
                       ></div>
                     </div>
                   </div>
 
                   <div class="mt-6 pt-6 border-t border-gray-100">
                     <h3 class="text-sm font-semibold text-gray-900 mb-3">
-                      Vitamins & Minerals (% Daily Value)
+                      Additional Info
                     </h3>
-                    <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="space-y-2 text-sm">
                       <div class="flex justify-between">
-                        <span class="text-gray-600">Vitamin A</span>
-                        <span class="font-medium">15%</span>
+                        <span class="text-gray-600">Saturated Fat</span>
+                        <span class="font-medium">${perServing ? perServing.saturatedFat : 0}g</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-gray-600">Vitamin C</span>
-                        <span class="font-medium">25%</span>
+                        <span class="text-gray-600">Cholesterol</span>
+                        <span class="font-medium">${perServing ? perServing.cholesterol : 0}mg</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-gray-600">Calcium</span>
-                        <span class="font-medium">4%</span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="text-gray-600">Iron</span>
-                        <span class="font-medium">12%</span>
+                        <span class="text-gray-600">Sodium</span>
+                        <span class="font-medium">${perServing ? perServing.sodium : 0}mg</span>
                       </div>
                     </div>
                   </div>
@@ -709,27 +723,19 @@ async function getMealDetails(mealId) {
           <p class="text-sm text-gray-600 mb-2">Estimated nutrition per serving:</p>
           <div class="grid grid-cols-4 gap-2 text-center">
             <div>
-              <p class="text-lg font-bold text-emerald-600" id="modal-calories">${
-                (caloriesData.totalCalories / 4).toFixed(2) || 'N/A'
-              }</p>
+              <p class="text-lg font-bold text-emerald-600" id="modal-calories">${caloriesPerServing}</p>
               <p class="text-xs text-gray-500">Calories</p>
             </div>
             <div>
-              <p class="text-lg font-bold text-blue-600" id="modal-protein">${
-                nutrientsData.protein.toFixed(2) || 'N/A'
-              }g</p>
+              <p class="text-lg font-bold text-blue-600" id="modal-protein">${proteinPerServing}g</p>
               <p class="text-xs text-gray-500">Protein</p>
             </div>
             <div>
-              <p class="text-lg font-bold text-amber-600" id="modal-carbs">${
-                nutrientsData.carbs.toFixed(2) || 'N/A'
-              }g</p>
+              <p class="text-lg font-bold text-amber-600" id="modal-carbs">${carbsPerServing}g</p>
               <p class="text-xs text-gray-500">Carbs</p>
             </div>
             <div>
-              <p class="text-lg font-bold text-purple-600" id="modal-fat">${
-                nutrientsData.fat.toFixed(2) || 'N/A'
-              }g</p>
+              <p class="text-lg font-bold text-purple-600" id="modal-fat">${fatPerServing}g</p>
               <p class="text-xs text-gray-500">Fat</p>
             </div>
           </div>
@@ -751,13 +757,13 @@ async function getMealDetails(mealId) {
         const servingsInput = document.getElementById('meal-servings');
 
         confirmLogMeal.addEventListener('click', () => {
-          const servings = parseFloat(servingsInput.value);
+          const userServings = parseFloat(servingsInput.value);
 
           const mealNutrition = {
-            calories: Math.round((caloriesData.totalCalories / 4) * servings),
-            protein: Math.round(nutrientsData.protein * servings),
-            carbs: Math.round(nutrientsData.carbs * servings),
-            fat: Math.round(nutrientsData.fat * servings),
+            calories: Math.round(caloriesPerServing * userServings),
+            protein: Math.round(proteinPerServing * userServings),
+            carbs: Math.round(carbsPerServing * userServings),
+            fat: Math.round(fatPerServing * userServings),
           };
 
           const mealLog = {
@@ -766,7 +772,7 @@ async function getMealDetails(mealId) {
             mealId: selectedMeal.id,
             category: selectedMeal.category,
             thumbnail: selectedMeal.thumbnail,
-            servings: servings,
+            servings: userServings,
             nutrition: mealNutrition,
             loggedAt: new Date().toISOString(),
           };
@@ -1179,8 +1185,8 @@ function displayFoodLog() {
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-semibold text-gray-700">Calories</span>
           <span class="text-sm text-gray-500">${foodLog.totalCalories} / ${
-    dailyGoals.calories
-  } kcal</span>
+            dailyGoals.calories
+          } kcal</span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-2.5">
           <div class="bg-emerald-500 h-2.5 rounded-full" style="width: ${
@@ -1194,8 +1200,8 @@ function displayFoodLog() {
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-semibold text-gray-700">Protein</span>
           <span class="text-sm text-gray-500">${foodLog.totalProtein} / ${
-    dailyGoals.protein
-  } g</span>
+            dailyGoals.protein
+          } g</span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-2.5">
           <div class="bg-blue-500 h-2.5 rounded-full" style="width: ${
@@ -1209,8 +1215,8 @@ function displayFoodLog() {
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-semibold text-gray-700">Carbs</span>
           <span class="text-sm text-gray-500">${foodLog.totalCarbs} / ${
-    dailyGoals.carbs
-  } g</span>
+            dailyGoals.carbs
+          } g</span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-2.5">
           <div class="bg-amber-500 h-2.5 rounded-full" style="width: ${
@@ -1224,8 +1230,8 @@ function displayFoodLog() {
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-semibold text-gray-700">Fat</span>
           <span class="text-sm text-gray-500">${foodLog.totalFat} / ${
-    dailyGoals.fat
-  } g</span>
+            dailyGoals.fat
+          } g</span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-2.5">
           <div class="bg-purple-500 h-2.5 rounded-full" style="width: ${
@@ -1937,84 +1943,151 @@ nutriScoreFilters.addEventListener('click', e => {
   }
 });
 
-function productCategoriesBtn() {
-  const categories = [
+async function productCategoriesBtn() {
+  // const categories = [
+  //   {
+  //     name: 'Beverages',
+  //     value: 'beverages',
+  //     icon: 'fa-solid fa-coffee',
+  //     colorFrom: 'from-blue-500',
+  //     colorTo: 'to-blue-500',
+  //   },
+  //   {
+  //     name: 'Breakfast',
+  //     value: 'breakfast',
+  //     icon: 'fa-solid fa-bowl-rice',
+  //     colorFrom: 'from-yellow-500',
+  //     colorTo: 'to-yellow-500',
+  //   },
+  //   {
+  //     name: 'Desserts',
+  //     value: 'desserts',
+  //     icon: 'fa-solid fa-birthday-cake',
+  //     colorFrom: 'from-pink-500',
+  //     colorTo: 'to-pink-500',
+  //   },
+  //   {
+  //     name: 'Dinner',
+  //     value: 'dinner',
+  //     icon: 'fa-solid fa-utensils',
+  //     colorFrom: 'from-green-500',
+  //     colorTo: 'to-green-500',
+  //   },
+  //   {
+  //     name: 'Snacks',
+  //     value: 'snacks',
+  //     icon: 'fa-solid fa-cookie',
+  //     colorFrom: 'from-orange-500',
+  //     colorTo: 'to-orange-500',
+  //   },
+  //   {
+  //     name: 'Fruits',
+  //     value: 'fruits',
+  //     icon: 'fa-solid fa-apple-whole',
+  //     colorFrom: 'from-amber-500',
+  //     colorTo: 'to-amber-500',
+  //   },
+  //   {
+  //     name: 'Vegetables',
+  //     value: 'vegetables',
+  //     icon: 'fa-solid fa-carrot',
+  //     colorFrom: 'from-orange-500',
+  //     colorTo: 'to-green-500',
+  //   },
+  // ];
+
+  const categoryStyles = [
     {
-      name: 'Beverages',
-      value: 'beverages',
-      icon: 'fa-solid fa-coffee',
-      colorFrom: 'from-blue-500',
-      colorTo: 'to-blue-500',
-    },
-    {
-      name: 'Breakfast',
-      value: 'breakfast',
-      icon: 'fa-solid fa-bowl-rice',
-      colorFrom: 'from-yellow-500',
-      colorTo: 'to-yellow-500',
-    },
-    {
-      name: 'Desserts',
-      value: 'desserts',
-      icon: 'fa-solid fa-birthday-cake',
-      colorFrom: 'from-pink-500',
-      colorTo: 'to-pink-500',
-    },
-    {
-      name: 'Dinner',
-      value: 'dinner',
-      icon: 'fa-solid fa-utensils',
       colorFrom: 'from-green-500',
-      colorTo: 'to-green-500',
+      colorTo: 'to-emerald-600',
+      icon: 'fa-solid fa-seedling',
     },
+
     {
-      name: 'Snacks',
-      value: 'snacks',
-      icon: 'fa-solid fa-cookie',
+      colorFrom: 'from-lime-500',
+      colorTo: 'to-green-700',
+      icon: 'fa-solid fa-leaf',
+    },
+
+    {
       colorFrom: 'from-orange-500',
-      colorTo: 'to-orange-500',
+      colorTo: 'to-amber-600',
+      icon: 'fa-solid fa-cookie-bite',
     },
+
     {
-      name: 'Fruits',
-      value: 'fruits',
-      icon: 'fa-solid fa-apple-whole',
-      colorFrom: 'from-amber-500',
-      colorTo: 'to-amber-500',
+      colorFrom: 'from-pink-500',
+      colorTo: 'to-rose-600',
+      icon: 'fa-solid fa-candy-cane',
     },
+
     {
-      name: 'Vegetables',
-      value: 'vegetables',
-      icon: 'fa-solid fa-carrot',
-      colorFrom: 'from-orange-500',
-      colorTo: 'to-green-500',
+      colorFrom: 'from-blue-500',
+      colorTo: 'to-cyan-600',
+      icon: 'fa-solid fa-mug-hot',
+    },
+
+    {
+      colorFrom: 'from-sky-400',
+      colorTo: 'to-blue-600',
+      icon: 'fa-solid fa-cheese',
+    },
+
+    {
+      colorFrom: 'from-yellow-500',
+      colorTo: 'to-orange-700',
+      icon: 'fa-solid fa-wheat-awn',
+    },
+
+    {
+      colorFrom: 'from-red-600',
+      colorTo: 'to-rose-800',
+      icon: 'fa-solid fa-drumstick-bite',
     },
   ];
 
-  productCategories.innerHTML = categories
-    .map(
-      c => `
-        <button 
-          class="product-category-btn flex-shrink-0 px-5 py-3 bg-gradient-to-r ${c.colorFrom} ${c.colorTo} text-white rounded-xl font-semibold hover:shadow-lg transition-all" 
-          data-category="${c.value}"
-        >
-          <i class="${c.icon}"></i> ${c.name}
-        </button>
-      `
-    )
+  const categories = new ProductCategories();
+  const data = await categories.getProductCategories();
+
+  const slicedData = data.slice(0, 8);
+  console.log(slicedData);
+
+  productCategories.innerHTML = slicedData
+    .map((c, index) => {
+      const style = categoryStyles[index];
+
+      return `
+      <button 
+        class="product-category-btn flex-shrink-0 px-5 py-3 bg-gradient-to-r 
+        ${style.colorFrom} ${style.colorTo}
+        text-white rounded-xl font-semibold hover:shadow-lg transition-all"
+        data-category="${c.name}"
+      >
+        <i class="${style.icon}"></i> ${c.name}
+      </button>
+    `;
+    })
     .join('');
 
   productCategories.addEventListener('click', async e => {
     const btn = e.target.closest('.product-category-btn');
     if (!btn) return;
 
+    const allButtons = document.querySelectorAll('.product-category-btn');
+
     try {
-      btn.disabled = true;
+      btn.classList.add('loading');
+
+      allButtons.forEach(b => {
+        if (b !== btn) b.classList.add('dimmed');
+      });
 
       const category = btn.dataset.category;
-      const productApi = new Product(category);
-      const data = await productApi.searchProductsByName();
+      const productApi = new ProductCategories();
 
-      const finalData = data.results.filter(
+      const data = await productApi.getProductByCategory(category);
+
+      const finalData = data.filter(
         p => p.name !== 'Unknown Product' && p.name !== 'Unknown'
       );
 
@@ -2024,7 +2097,9 @@ function productCategoriesBtn() {
       console.error(err);
       alert('Something went wrong');
     } finally {
-      btn.disabled = false;
+      btn.classList.remove('loading');
+
+      allButtons.forEach(b => b.classList.remove('dimmed'));
     }
   });
 }
@@ -2065,144 +2140,129 @@ async function productSearch(val) {
 function renderProducts(products) {
   try {
     productsGrid.innerHTML = `
-      <div class="flex items-center justify-center h-[calc(100vh-20rem)] w-full">
+      <div class="flex items-center justify-center h-[calc(100vh-20rem)] w-full col-span-2">
         <div class="loader"></div>
       </div>
     `;
 
     setTimeout(() => {
       productsCount.textContent = `found ${products.length} products ${
-        productSearchInput.value ? `for : "${productSearchInput.value}"` : ''
+        productSearchInput.value ? `for: "${productSearchInput.value}"` : ''
       }`;
 
       if (products.length === 0) {
         productsCount.textContent = `No products found ${
-          productSearchInput.value ? `for : "${productSearchInput.value}"` : ''
+          productSearchInput.value ? `for: "${productSearchInput.value}"` : ''
         }`;
         productsGrid.classList.remove('grid', 'grid-cols-2', 'gap-4');
         productsGrid.innerHTML = `
-      <div class="flex flex-col items-center justify-center h-[calc(100vh-20rem)] w-full text-center">
-          <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+          <div class="flex flex-col items-center justify-center h-[calc(100vh-20rem)] w-full text-center">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <i class="fa-solid fa-box-open text-gray-400 text-2xl"></i>
+            </div>
+            <p class="text-gray-500 text-lg">No products found</p>
+            <p class="text-gray-400 text-sm mt-2">Try searching for something else</p>
           </div>
-          <p class="text-gray-500 text-lg">No products found</p>
-          <p class="text-gray-400 text-sm mt-2">Try searching for something else</p>
-      </div>
-      `;
+        `;
         return;
-      } else {
-        productsGrid.classList.add('grid', 'grid-cols-2', 'gap-4');
       }
+
+      productsGrid.classList.add('grid', 'grid-cols-2', 'gap-4');
 
       const html = products
         .slice(0, 12)
         .map(
           product => `
-       <div
-          class="product-card bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer group"
-          data-barcode="${product.barcode || 'N/A'}"
-        >
-          <div
-            class="relative h-40 bg-gray-100 flex items-center justify-center overflow-hidden"
-          >
-            <img
-              class="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
-              src="${product.image || './src/images/placeholder.png'}"
-              alt="${product.name || 'Product Image'}"
-              loading="lazy"
-            />
-
-            <!-- Nutri-Score Badge -->
             <div
-              class="absolute top-2 left-2 text-white text-xs font-bold px-2 py-1 rounded uppercase ${
-                product.nutritionGrade === 'a'
-                  ? 'bg-green-500'
-                  : product.nutritionGrade === 'b'
-                  ? 'bg-yellow-500'
-                  : product.nutritionGrade === 'c'
-                  ? 'bg-orange-500'
-                  : 'bg-red-500'
-              }"
+              class="product-card bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer group"
+              data-barcode="${product.barcode || 'N/A'}"
             >
-              Nutri-Score ${product.nutritionGrade || 'N/A'}
-            </div>
+              <div class="relative h-40 bg-gray-100 flex items-center justify-center overflow-hidden">
+                <img
+                  class="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
+                  src="${product.image || './src/images/placeholder.png'}"
+                  alt="${product.name || 'Product Image'}"
+                  loading="lazy"
+                  onerror="this.src='./src/images/placeholder.png'"
+                />
 
-            <!-- NOVA Badge -->
-            <div
-              class="absolute top-2 right-2 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${
-                product.novaGroup === '1'
-                  ? 'bg-green-500'
-                  : product.novaGroup === '2'
-                  ? 'bg-yellow-500'
-                  : product.novaGroup === '3'
-                  ? 'bg-orange-500'
-                  : 'bg-red-500'
-              }"
-              title="NOVA ${product.novaGroup || 'N/A'}"
-            >
-              ${product.novaGroup || 'N/A'}
-            </div>
-          </div>
+                <!-- Nutri-Score Badge -->
+                ${
+                  product.nutritionGrade
+                    ? `
+                <div class="absolute top-2 left-2 text-white text-xs font-bold px-2 py-1 rounded uppercase ${
+                  product.nutritionGrade === 'a'
+                    ? 'bg-green-500'
+                    : product.nutritionGrade === 'b'
+                      ? 'bg-yellow-500'
+                      : product.nutritionGrade === 'c'
+                        ? 'bg-orange-500'
+                        : 'bg-red-500'
+                }">
+                  Nutri-Score ${product.nutritionGrade.toUpperCase()}
+                </div>
+                `
+                    : ''
+                }
 
-          <div class="p-4">
-            <p
-              class="text-xs text-emerald-600 font-semibold mb-1 truncate"
-            >
-              ${product.brand || 'N/A'}
-            </p>
-            <h3
-              class="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-emerald-600 transition-colors"
-            >
-              ${product.name || 'Product Name'}
-            </h3>
+                <!-- NOVA Badge -->
+                ${
+                  product.novaGroup
+                    ? `
+                <div class="absolute top-2 right-2 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${
+                  product.novaGroup === '1'
+                    ? 'bg-green-500'
+                    : product.novaGroup === '2'
+                      ? 'bg-yellow-500'
+                      : product.novaGroup === '3'
+                        ? 'bg-orange-500'
+                        : 'bg-red-500'
+                }" title="NOVA ${product.novaGroup}">
+                  ${product.novaGroup}
+                </div>
+                `
+                    : ''
+                }
+              </div>
 
-            <div
-              class="flex items-center gap-3 text-xs text-gray-500 mb-3"
-            >
-              <span
-                ><i class="fa-solid fa-weight-scale mr-1"></i>${
-                  product.servingSize || 'N/A'
-                }</span
-              >
-              <span
-                ><i class="fa-solid fa-fire mr-1"></i>${
-                  product.nutrients.calories || 'N/A'
-                } kcal/100g</span
-              >
-            </div>
+              <div class="p-4">
+                <p class="text-xs text-emerald-600 font-semibold mb-1 truncate">
+                  ${product.brand || 'Unknown Brand'}
+                </p>
+                <h3 class="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-emerald-600 transition-colors">
+                  ${product.name || 'Product Name'}
+                </h3>
 
-            <!-- Mini Nutrition -->
-            <div class="grid grid-cols-4 gap-1 text-center">
-              <div class="bg-emerald-50 rounded p-1.5">
-                <p class="text-xs font-bold text-emerald-700">${
-                  product.nutrients.protein || 'N/A'
-                }g</p>
-                <p class="text-[10px] text-gray-500">Protein</p>
-              </div>
-              <div class="bg-blue-50 rounded p-1.5">
-                <p class="text-xs font-bold text-blue-700">${
-                  product.nutrients.carbs || 'N/A'
-                }g</p>
-                <p class="text-[10px] text-gray-500">Carbs</p>
-              </div>
-              <div class="bg-purple-50 rounded p-1.5">
-                <p class="text-xs font-bold text-purple-700">${
-                  product.nutrients.fat || 'N/A'
-                }g</p>
-                <p class="text-[10px] text-gray-500">Fat</p>
-              </div>
-              <div class="bg-orange-50 rounded p-1.5">
-                <p class="text-xs font-bold text-orange-700">${
-                  product.nutrients.sugar || 'N/A'
-                }g</p>
-                <p class="text-[10px] text-gray-500">Sugar</p>
+                <div class="flex items-center gap-3 text-xs text-gray-500 mb-3">
+                  <span><i class="fa-solid fa-weight-scale mr-1"></i>${product.servingSize || '100g'}</span>
+                  <span><i class="fa-solid fa-fire mr-1"></i>${product.nutrients?.calories || 'N/A'} kcal</span>
+                </div>
+
+                <!-- Mini Nutrition -->
+                <div class="grid grid-cols-4 gap-1 text-center">
+                  <div class="bg-emerald-50 rounded p-1.5">
+                    <p class="text-xs font-bold text-emerald-700">${product.nutrients?.protein || '0'}g</p>
+                    <p class="text-[10px] text-gray-500">Protein</p>
+                  </div>
+                  <div class="bg-blue-50 rounded p-1.5">
+                    <p class="text-xs font-bold text-blue-700">${product.nutrients?.carbs || '0'}g</p>
+                    <p class="text-[10px] text-gray-500">Carbs</p>
+                  </div>
+                  <div class="bg-purple-50 rounded p-1.5">
+                    <p class="text-xs font-bold text-purple-700">${product.nutrients?.fat || '0'}g</p>
+                    <p class="text-[10px] text-gray-500">Fat</p>
+                  </div>
+                  <div class="bg-orange-50 rounded p-1.5">
+                    <p class="text-xs font-bold text-orange-700">${product.nutrients?.sugar || '0'}g</p>
+                    <p class="text-[10px] text-gray-500">Sugar</p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-    `
+          `
         )
         .join('');
+
       productsGrid.innerHTML = html;
 
       document.querySelectorAll('.product-card').forEach((card, index) => {
@@ -2212,92 +2272,97 @@ function renderProducts(products) {
       });
     }, 500);
   } catch (error) {
-    console.error(error);
-    Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: `Failed to fetch products. ${error.message}`,
-      confirmButtonText: 'OK',
-      customClass: {
-        confirmButton: 'bg-red-600 hover:bg-red-700 px-6 py-3 rounded-xl',
-      },
-    });
+    console.error('Render products error:', error);
+    productsGrid.classList.remove('grid', 'grid-cols-2', 'gap-4');
+    productsGrid.innerHTML = `
+      <div class="flex flex-col items-center justify-center h-[calc(100vh-20rem)] w-full text-center">
+        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+          <i class="fa-solid fa-exclamation-triangle text-red-500 text-2xl"></i>
+        </div>
+        <p class="text-gray-700 text-lg font-semibold mb-2">Error Loading Products</p>
+        <p class="text-gray-500 text-sm">${error.message}</p>
+      </div>
+    `;
   }
 }
 
 function showProductDetails(product) {
-  currentProduct = product;
+  if (!product || !product.nutrients) {
+    console.error('Invalid product data:', product);
+    return;
+  }
 
+  currentProduct = product;
   const nutriScore = getNutriScoreInfo(product.nutritionGrade);
   const nova = getNovaInfo(product.novaGroup);
 
-  const proteinPercent = Math.min(
-    (parseFloat(product.nutrients.protein) / 50) * 100,
-    100
-  );
-  const carbsPercent = Math.min(
-    (parseFloat(product.nutrients.carbs) / 300) * 100,
-    100
-  );
-  const fatPercent = Math.min(
-    (parseFloat(product.nutrients.fat) / 70) * 100,
-    100
-  );
-  const sugarPercent = Math.min(
-    (parseFloat(product.nutrients.sugar) / 90) * 100,
-    100
-  );
+  const nutrients = {
+    calories: parseFloat(product.nutrients.calories) || 0,
+    protein: parseFloat(product.nutrients.protein) || 0,
+    carbs: parseFloat(product.nutrients.carbs) || 0,
+    fat: parseFloat(product.nutrients.fat) || 0,
+    sugar: parseFloat(product.nutrients.sugar) || 0,
+    saturatedFat: parseFloat(product.nutrients.saturatedFat) || 0,
+    fiber: parseFloat(product.nutrients.fiber) || 0,
+    salt: parseFloat(product.nutrients.salt) || 0,
+  };
+
+  const proteinPercent = Math.min((nutrients.protein / 50) * 100, 100);
+  const carbsPercent = Math.min((nutrients.carbs / 300) * 100, 100);
+  const fatPercent = Math.min((nutrients.fat / 70) * 100, 100);
+  const sugarPercent = Math.min((nutrients.sugar / 90) * 100, 100);
+
+  const modal =
+    document.getElementById('product-modal') ||
+    document.getElementById('log-meal-modal');
 
   modal.innerHTML = `
     <div class="bg-white rounded-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <div class="p-6">
         <div class="flex items-start gap-6 mb-6">
           <div class="w-32 h-32 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0">
-            <img src="${
-              product.image || './src/images/placeholder.png'
-            }" alt="${product.name}" class="w-full h-full object-contain" />
+            <img 
+              src="${product.image || './src/images/placeholder.png'}" 
+              alt="${product.name}" 
+              class="w-full h-full object-contain"
+              onerror="this.src='./src/images/placeholder.png'"
+            />
           </div>
           <div class="flex-1">
-            <p class="text-sm text-emerald-600 font-semibold mb-1">${
-              product.brand || 'Unknown Brand'
-            }</p>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">${
-              product.name || 'Product Name'
-            }</h2>
-            <p class="text-sm text-gray-500 mb-3">${
-              product.servingSize || ''
-            }</p>
-            <div class="flex items-center gap-3">
-              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg" style="background-color: ${
-                nutriScore.light
-              }">
-                <span class="w-8 h-8 rounded flex items-center justify-center text-white font-bold" style="background-color: ${
-                  nutriScore.bg
-                }">
-                  ${product.nutritionGrade?.toUpperCase() || 'N/A'}
+            <p class="text-sm text-emerald-600 font-semibold mb-1">${product.brand || 'Unknown Brand'}</p>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">${product.name || 'Product Name'}</h2>
+            <p class="text-sm text-gray-500 mb-3">${product.servingSize || '100g'}</p>
+            <div class="flex items-center gap-3 flex-wrap">
+              ${
+                product.nutritionGrade
+                  ? `
+              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg" style="background-color: ${nutriScore.light}">
+                <span class="w-8 h-8 rounded flex items-center justify-center text-white font-bold" style="background-color: ${nutriScore.bg}">
+                  ${product.nutritionGrade.toUpperCase()}
                 </span>
                 <div>
-                  <p class="text-xs font-bold" style="color: ${
-                    nutriScore.bg
-                  }">Nutri-Score</p>
+                  <p class="text-xs font-bold" style="color: ${nutriScore.bg}">Nutri-Score</p>
                   <p class="text-[10px] text-gray-600">${nutriScore.text}</p>
                 </div>
               </div>
-              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg" style="background-color: ${
-                nova.light
-              }">
-                <span class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style="background-color: ${
-                  nova.bg
-                }">
-                  ${product.novaGroup || 'N/A'}
+              `
+                  : ''
+              }
+              ${
+                product.novaGroup
+                  ? `
+              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg" style="background-color: ${nova.light}">
+                <span class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style="background-color: ${nova.bg}">
+                  ${product.novaGroup}
                 </span>
                 <div>
-                  <p class="text-xs font-bold" style="color: ${
-                    nova.bg
-                  }">NOVA</p>
+                  <p class="text-xs font-bold" style="color: ${nova.bg}">NOVA</p>
                   <p class="text-[10px] text-gray-600">${nova.text}</p>
                 </div>
               </div>
+              `
+                  : ''
+              }
             </div>
           </div>
           <button class="close-product-modal text-gray-400 hover:text-gray-600">
@@ -2312,9 +2377,7 @@ function showProductDetails(product) {
             <span class="text-sm font-normal text-gray-500">(per 100g)</span>
           </h3>
           <div class="text-center mb-4 pb-4 border-b border-emerald-200">
-            <p class="text-4xl font-bold text-gray-900">${
-              product.nutrients.calories || 'N/A'
-            }</p>
+            <p class="text-4xl font-bold text-gray-900">${nutrients.calories}</p>
             <p class="text-sm text-gray-500">Calories</p>
           </div>
 
@@ -2323,57 +2386,43 @@ function showProductDetails(product) {
               <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
                 <div class="bg-emerald-500 h-2 rounded-full" style="width: ${proteinPercent}%"></div>
               </div>
-              <p class="text-lg font-bold text-emerald-600">${
-                product.nutrients.protein || 'N/A'
-              }g</p>
+              <p class="text-lg font-bold text-emerald-600">${nutrients.protein}g</p>
               <p class="text-xs text-gray-500">Protein</p>
             </div>
             <div class="text-center">
               <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
                 <div class="bg-blue-500 h-2 rounded-full" style="width: ${carbsPercent}%"></div>
               </div>
-              <p class="text-lg font-bold text-blue-600">${
-                product.nutrients.carbs || 'N/A'
-              }g</p>
+              <p class="text-lg font-bold text-blue-600">${nutrients.carbs}g</p>
               <p class="text-xs text-gray-500">Carbs</p>
             </div>
             <div class="text-center">
               <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
                 <div class="bg-purple-500 h-2 rounded-full" style="width: ${fatPercent}%"></div>
               </div>
-              <p class="text-lg font-bold text-purple-600">${
-                product.nutrients.fat || 'N/A'
-              }g</p>
+              <p class="text-lg font-bold text-purple-600">${nutrients.fat}g</p>
               <p class="text-xs text-gray-500">Fat</p>
             </div>
             <div class="text-center">
               <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
                 <div class="bg-orange-500 h-2 rounded-full" style="width: ${sugarPercent}%"></div>
               </div>
-              <p class="text-lg font-bold text-orange-600">${
-                product.nutrients.sugar || 'N/A'
-              }g</p>
+              <p class="text-lg font-bold text-orange-600">${nutrients.sugar}g</p>
               <p class="text-xs text-gray-500">Sugar</p>
             </div>
           </div>
 
           <div class="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-emerald-200">
             <div class="text-center">
-              <p class="text-sm font-semibold text-gray-900">${
-                product.nutrients.saturatedFat || 'N/A'
-              }g</p>
+              <p class="text-sm font-semibold text-gray-900">${nutrients.saturatedFat}g</p>
               <p class="text-xs text-gray-500">Saturated Fat</p>
             </div>
             <div class="text-center">
-              <p class="text-sm font-semibold text-gray-900">${
-                product.nutrients.fiber || 'N/A'
-              }g</p>
+              <p class="text-sm font-semibold text-gray-900">${nutrients.fiber}g</p>
               <p class="text-xs text-gray-500">Fiber</p>
             </div>
             <div class="text-center">
-              <p class="text-sm font-semibold text-gray-900">${
-                product.nutrients.salt || 'N/A'
-              }g</p>
+              <p class="text-sm font-semibold text-gray-900">${nutrients.salt}g</p>
               <p class="text-xs text-gray-500">Salt</p>
             </div>
           </div>
@@ -2388,7 +2437,8 @@ function showProductDetails(product) {
             Ingredients
           </h3>
           <p class="text-sm text-gray-600 leading-relaxed">${product.ingredients}</p>
-        </div>`
+        </div>
+        `
             : ''
         }
 
@@ -2404,7 +2454,7 @@ function showProductDetails(product) {
     </div>
   `;
 
-  modal.classList.remove('hidden');
+  modal.classList.remove('hidden', 'loading');
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 
@@ -2416,18 +2466,32 @@ function showProductDetails(product) {
     });
   });
 
-  document.getElementById('log-product-btn').addEventListener('click', () => {
-    showLogModal();
-  });
+  const logBtn = document.getElementById('log-product-btn');
+  if (logBtn) {
+    logBtn.addEventListener('click', () => {
+      showLogModal();
+    });
+  }
 }
 
 function showLogModal() {
+  if (!currentProduct) {
+    console.error('No current product selected');
+    return;
+  }
+
   const logModal = document.getElementById('log-meal-modal');
+  const nutrients = currentProduct.nutrients || {};
 
   logModal.innerHTML = `
     <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
       <div class="flex items-center gap-4 mb-6">
-        <img src="${currentProduct.image}" alt="${currentProduct.name}" class="w-16 h-16 rounded-xl object-cover" />
+        <img 
+          src="${currentProduct.image || './src/images/placeholder.png'}" 
+          alt="${currentProduct.name}" 
+          class="w-16 h-16 rounded-xl object-cover"
+          onerror="this.src='./src/images/placeholder.png'"
+        />
         <div>
           <h3 class="text-xl font-bold text-gray-900">Log This Product</h3>
           <p class="text-gray-500 text-sm">${currentProduct.name}</p>
@@ -2451,19 +2515,19 @@ function showLogModal() {
         <p class="text-sm text-gray-600 mb-2">Estimated nutrition:</p>
         <div class="grid grid-cols-4 gap-2 text-center">
           <div>
-            <p class="text-lg font-bold text-emerald-600" id="modal-calories">${currentProduct.nutrients.calories}</p>
+            <p class="text-lg font-bold text-emerald-600" id="modal-calories">${nutrients.calories || 0}</p>
             <p class="text-xs text-gray-500">Calories</p>
           </div>
           <div>
-            <p class="text-lg font-bold text-blue-600" id="modal-protein">${currentProduct.nutrients.protein}g</p>
+            <p class="text-lg font-bold text-blue-600" id="modal-protein">${nutrients.protein || 0}g</p>
             <p class="text-xs text-gray-500">Protein</p>
           </div>
           <div>
-            <p class="text-lg font-bold text-amber-600" id="modal-carbs">${currentProduct.nutrients.carbs}g</p>
+            <p class="text-lg font-bold text-amber-600" id="modal-carbs">${nutrients.carbs || 0}g</p>
             <p class="text-xs text-gray-500">Carbs</p>
           </div>
           <div>
-            <p class="text-lg font-bold text-purple-600" id="modal-fat">${currentProduct.nutrients.fat}g</p>
+            <p class="text-lg font-bold text-purple-600" id="modal-fat">${nutrients.fat || 0}g</p>
             <p class="text-xs text-gray-500">Fat</p>
           </div>
         </div>
@@ -2478,7 +2542,8 @@ function showLogModal() {
     </div>
   `;
 
-  logModal.classList.remove('loading');
+  logModal.classList.remove('loading', 'hidden');
+  logModal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 
   const quantityInput = document.getElementById('product-quantity');
@@ -2486,35 +2551,44 @@ function showLogModal() {
   const increaseBtn = document.getElementById('increase-servings');
 
   const updateNutrition = () => {
-    const qty = parseFloat(quantityInput.value);
+    const qty = parseFloat(quantityInput.value) || 1;
     document.getElementById('modal-calories').textContent = Math.round(
-      currentProduct.nutrients.calories * qty
+      (nutrients.calories || 0) * qty
     );
     document.getElementById('modal-protein').textContent =
-      (currentProduct.nutrients.protein * qty).toFixed(1) + 'g';
+      ((nutrients.protein || 0) * qty).toFixed(1) + 'g';
     document.getElementById('modal-carbs').textContent =
-      (currentProduct.nutrients.carbs * qty).toFixed(1) + 'g';
+      ((nutrients.carbs || 0) * qty).toFixed(1) + 'g';
     document.getElementById('modal-fat').textContent =
-      (currentProduct.nutrients.fat * qty).toFixed(1) + 'g';
+      ((nutrients.fat || 0) * qty).toFixed(1) + 'g';
   };
 
   quantityInput.addEventListener('input', updateNutrition);
+
   decreaseBtn.addEventListener('click', () => {
-    quantityInput.value = Math.max(parseFloat(quantityInput.value) - 0.5, 0.5);
+    quantityInput.value = Math.max(
+      parseFloat(quantityInput.value) - 0.5,
+      0.5
+    ).toFixed(1);
     updateNutrition();
   });
+
   increaseBtn.addEventListener('click', () => {
-    quantityInput.value = Math.min(parseFloat(quantityInput.value) + 0.5, 10);
+    quantityInput.value = Math.min(
+      parseFloat(quantityInput.value) + 0.5,
+      10
+    ).toFixed(1);
     updateNutrition();
   });
 
   document.getElementById('cancel-log').addEventListener('click', () => {
-    logModal.classList.add('loading');
+    logModal.classList.add('loading', 'hidden');
+    logModal.style.display = 'none';
     document.body.style.overflow = 'auto';
   });
 
   document.getElementById('confirm-log').addEventListener('click', () => {
-    const qty = parseFloat(quantityInput.value);
+    const qty = parseFloat(quantityInput.value) || 1;
 
     const productLog = {
       type: 'product',
@@ -2525,10 +2599,10 @@ function showLogModal() {
       image: currentProduct.image,
       servings: qty,
       nutrition: {
-        calories: Math.round(currentProduct.nutrients.calories * qty),
-        protein: Math.round(currentProduct.nutrients.protein * qty),
-        carbs: Math.round(currentProduct.nutrients.carbs * qty),
-        fat: Math.round(currentProduct.nutrients.fat * qty),
+        calories: Math.round((nutrients.calories || 0) * qty),
+        protein: Math.round((nutrients.protein || 0) * qty),
+        carbs: Math.round((nutrients.carbs || 0) * qty),
+        fat: Math.round((nutrients.fat || 0) * qty),
       },
       loggedAt: new Date().toISOString(),
     };
@@ -2552,12 +2626,19 @@ function showLogModal() {
     Swal.fire({
       icon: 'success',
       title: 'Product logged successfully',
-      confirmButtonText: 'OK',
+      timer: 1500,
+      showConfirmButton: false,
     });
 
-    logModal.classList.add('loading');
-    modal.classList.add('hidden');
-    modal.style.display = 'none';
+    logModal.classList.add('loading', 'hidden');
+    logModal.style.display = 'none';
+
+    const productModal =
+      document.getElementById('product-modal') ||
+      document.getElementById('log-meal-modal');
+    productModal.classList.add('hidden');
+    productModal.style.display = 'none';
+
     document.body.style.overflow = 'auto';
 
     if (typeof displayFoodLog === 'function') displayFoodLog();
@@ -2566,23 +2647,24 @@ function showLogModal() {
 
 function getNutriScoreInfo(grade) {
   const colors = {
-    A: { bg: '#038141', light: '#03814120', text: 'Excellent' },
-    B: { bg: '#85bb2f', light: '#85bb2f20', text: 'Good' },
-    C: { bg: '#fecb02', light: '#fecb0220', text: 'Fair' },
-    D: { bg: '#ee8100', light: '#ee810020', text: 'Poor' },
-    E: { bg: '#e63e11', light: '#e63e1120', text: 'Very Poor' },
+    a: { bg: '#038141', light: '#03814120', text: 'Excellent' },
+    b: { bg: '#85bb2f', light: '#85bb2f20', text: 'Good' },
+    c: { bg: '#fecb02', light: '#fecb0220', text: 'Fair' },
+    d: { bg: '#ee8100', light: '#ee810020', text: 'Poor' },
+    e: { bg: '#e63e11', light: '#e63e1120', text: 'Very Poor' },
   };
-  return colors[grade?.toUpperCase()] || colors['D'];
+  return colors[grade?.toLowerCase()] || colors['d'];
 }
 
 function getNovaInfo(group) {
+  const groupStr = String(group);
   const colors = {
     1: { bg: '#038141', light: '#03814120', text: 'Unprocessed' },
     2: { bg: '#85bb2f', light: '#85bb2f20', text: 'Processed' },
     3: { bg: '#ee8100', light: '#ee810020', text: 'Processed' },
     4: { bg: '#e63e11', light: '#e63e1120', text: 'Ultra-processed' },
   };
-  return colors[group] || colors['4'];
+  return colors[groupStr] || colors['4'];
 }
 
 modal.addEventListener('click', e => {
