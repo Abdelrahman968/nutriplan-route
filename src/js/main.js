@@ -830,7 +830,7 @@ async function getMealDetails(mealId) {
 
       if (backBtn) {
         e.preventDefault();
-        window.location.href = 'https://abdelrahman968.github.io/nutriplan-route/#meals';
+        window.location.hash = '#meals';
         searchFiltersSection.style.display = 'block';
         mealCategoriesSection.style.display = 'block';
         allRecipesSection.style.display = 'block';
@@ -1573,7 +1573,7 @@ function setupQuickActions() {
     btn.addEventListener('click', () => {
       switch (index) {
         case 0:
-          window.location.href = 'https://abdelrahman968.github.io/nutriplan-route/#meals';
+          window.location.hash = '#meals';
           searchFiltersSection.style.display = 'block';
           mealCategoriesSection.style.display = 'block';
           allRecipesSection.style.display = 'block';
@@ -1583,7 +1583,7 @@ function setupQuickActions() {
           break;
 
         case 1:
-          window.location.href = 'https://abdelrahman968.github.io/nutriplan-route/#products';
+          window.location.hash = '#products';
           searchFiltersSection.style.display = 'none';
           mealCategoriesSection.style.display = 'none';
           allRecipesSection.style.display = 'none';
